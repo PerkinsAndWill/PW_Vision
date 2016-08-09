@@ -1,6 +1,6 @@
 %% Filter detections
 
-function filteredIdx = detectionFilter (maxRatio, maxArea, bbox)
+function [filteredIdx, filteredCentroids] = detectionFilter (maxRatio, maxArea, bbox, centroids)
 
 %Calculate Ratio, Area
 w = bbox(:,3);
@@ -18,6 +18,7 @@ badBbox = badBbox | area > maxArea;
 % disp(badBbox);
 
 filteredIdx = bbox(logical(~badBbox), :);
+filteredCentroids = centroids(logical(~badBbox), :);
 
 % disp(filteredIdx);
 

@@ -18,23 +18,38 @@ peopleRatio = .6;
 vPlayer = vision.VideoPlayer();
 fPlayer = vision.VideoPlayer();
    
+% opticFlow = opticalFlowLK();
+
 while ~isDone(video)
     
    frame = step(video);
-   mask = step(foregroundDetector, frame);
+   mask = foregroundDetector.step(frame);
    
-   cleanMask = imopen(mask, strel('Disk',2));
+%    cleanMask = imopen(mask, strel('Disk',1));
+   cleanMask = imopen(cleanMask, strel('rectangle', [3,3]));
+   cleanMask = imclose(cleanMask, strel('rectangle', [15, 15])); 
+   cleanMask = imfill(cleanMask, 'holes');
    
+%    flow = estimateFlow(opticFlow, cleanMask);
    
-   bboxes = step(blobs, cleanMask);
+   [~, centroids, bboxes] = blobs.step(cleanMask);
+   
+%    [peoples, scores] = detectPeopleACF(frame,...
+%             'Model','caltech',...
+%             'NumScaleLevels', 32);
    
    if ~isempty(bboxes)
 
-        bboxDogs = detectionFilter(dogRatio, 400, bboxes);
-        bboxPeople = detectionFilter(peopleRatio, 1500, bboxes);
+        [bboxDogs, centDogs] = detectionFilter(dogRatio, 400, bboxes, centroids);
+        [bboxPeople, centPeople] = detectionFilter(peopleRatio, 1500, bboxes, centroids);
    frame = insertShape(frame, 'rectangle', bboxDogs, 'Color', 'green');
    frame = insertShape(frame, 'rectangle', bboxPeople, 'Color', 'red');
 %    cleanMask = insertShape(cleanMask, 'rectangle', bboxPeople, 'Color', 'green');
+   
+%    imshow(frame);
+%    hold on;
+%    plot(flow,'DecimationFactor', [5,5], 'ScaleFactor', 25);
+%    hold off;
    end
    
    step(vPlayer, frame);

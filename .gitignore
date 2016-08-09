@@ -1,0 +1,12 @@
+# Images and videos #
+*.tif
+*.avi
+*.jpeg
+*.gif
+*.png
+
+# Autosaves #
+*.asv
+
+# Example Files #
+DetectPeopleExample.m
