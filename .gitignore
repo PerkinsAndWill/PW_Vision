@@ -10,3 +10,8 @@
 
 # Example Files #
 DetectPeopleExample.m
+PedestrianTrackingFromMovingCameraExample.m
+
+# Old Files #
+detectionFilter.m
+BlobAnalysis.m
