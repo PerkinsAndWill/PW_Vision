@@ -14,6 +14,9 @@ tracks = initializeTracks();
 % ID of the next track.
 nextId = 1; 
 
+% Object Count
+count = 0;
+
 %Get a still of the first frame
 frame = step(obj.reader);
 
@@ -24,10 +27,10 @@ option.costOfNonAssignment  = 10;                    % A tuning parameter to con
 option.confidenceThresh     = 2;                     % A threshold to determine if a track is true positive or false alarm.
 option.ageThresh            = 4;                     % A threshold to determine the minimum length required for a track being true positive.
 option.visThresh            = 0.6;                   % A threshold to determine the minimum visibility value for a track being true positive.
-option.invisibTooLong       = 5;                     % A threshold to determine if a track has gone off frame.
+option.invisibTooLong       = 8;                     % A threshold to determine if a track has gone off frame.
 option.ROI					= roipoly(frame);		 % User-defined Region of Interest (ROI) to help filter detections.
 
-close(frame);
+close all;
 
 
 while ~isDone(obj.reader);
@@ -48,6 +51,8 @@ while ~isDone(obj.reader);
     createNewTracks();
     
     displayTrackingResults();
+    
+%     countTrackedObjects(tracked);
 
     % Exit the loop if the video player figure is closed by user.     
     if ~isDone(obj.reader) && (~isOpen(obj.videoPlayer) || ~isOpen(obj.maskPlayer))
@@ -81,7 +86,7 @@ end
         % to the background. 
         
         obj.detector = vision.ForegroundDetector('NumGaussians', 3, ...
-            'NumTrainingFrames', 75, 'LearningRate', 0.01);
+            'NumTrainingFrames', 100, 'LearningRate', 0.01);
         
         % Connected groups of foreground pixels are likely to correspond to moving
         % objects.  The blob analysis System object is used to find such groups
@@ -105,7 +110,9 @@ end
             'age', {}, ...
             'totalVisibleCount', {}, ...
             'consecutiveInvisibleCount', {}, ...
-            'predPosition', {});
+            'predPosition', {},...
+            'number', {},...
+            'displayed', {});
     end    
 
 %% Detect objects
@@ -116,8 +123,8 @@ end
 		mask =  obj.detector.step(frame);
 		
 		%Morphological Image cleaning
-		cleanMask = imopen(mask, strel('rectangle', [2,2]));
-% 		cleanMask = imclose(cleanMask, strel('rectangle', [5,5]));
+		cleanMask = imopen(mask, strel('square', 3));
+% 		cleanMask = imclose(cleanMask, strel('disk', 5));
 %         cleanMask = imerode(cleanMask, strel('disk', 2));
 		cleanMask = imfill(cleanMask, 'holes');
 		mask = cleanMask;
@@ -183,7 +190,7 @@ end
             bbox = tracks(i).bbox;
             
             % Predict the current location of the track.
-            predictedCentroid = predict(tracks(i).kalmanFilter);
+            predictedCentroid = vision.KalmanFilter.predict(tracks(i).kalmanFilter);
             
             % Shift the bounding box so that its center is at 
             % the predicted location.
@@ -284,7 +291,7 @@ end
             
             % Create a Kalman filter object.
             kalmanFilter = configureKalmanFilter('ConstantVelocity', ...
-                centroid, [50, 200], [25, 250], 500);
+                centroid, [50, 200], [25, 300], 250);
             
             % Create a new track.
             newTrack = struct(...
@@ -294,7 +301,9 @@ end
                 'age', 1, ...
                 'totalVisibleCount', 1, ...
                 'consecutiveInvisibleCount', 0, ...
-				'predPosition', bbox);
+				'predPosition', bbox, ...
+                'number', 0, ...
+                'displayed', false);
             
             % Add it to the array of tracks.
             tracks(end + 1) = newTrack;
@@ -323,6 +332,20 @@ end
             % Display the objects. If an object has not been detected
             % in this frame, display its predicted bounding box.
             if ~isempty(reliableTracks)
+                
+                for i = 1:length(reliableTracks)
+                
+                    if reliableTracks(i).displayed == false
+                        count = count + 1;
+                        reliableTracks(i).displayed = true;
+                    end
+                end
+                countid = reliableTracks(:).id;
+                
+                for i = length(reliableTracks);
+                    tracks(countid(i)).displayed = true;
+                end
+                
                 % Get bounding boxes.
                 bboxes = cat(1, reliableTracks.bbox);
                 
@@ -346,9 +369,16 @@ end
             end
         end
         
-		step (obj.videoPlayer, frame)
-		step (obj.maskPlayer, mask)
-	end
+        frame  = insertText(frame, [10 10], count, 'BoxOpacity', 1, ...
+            'FontSize', 14);
+
+        step (obj.videoPlayer, frame)
+        step (obj.maskPlayer, mask)
+    end
+
+%% Count Tracked Objects
+
+%     function countTrackedObjects(tracked)
 %% release video reader, player
 release(obj.videoPlayer);
 release(obj.reader);
