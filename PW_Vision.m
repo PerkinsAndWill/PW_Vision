@@ -21,8 +21,8 @@ count = 0;
 frame = step(obj.reader);
 
 % Set the global parameters
-option.peopleRatio          = 3;					 % Aspect ratio to filter out blobs.
-option.peopleArea           = 5000;                  % A threshold to control the area for detecting pedestrians. 
+option.peopleRatio          = 2;					 % Aspect ratio to filter out blobs.
+option.peopleArea           = 55000;                  % A threshold to control the area for detecting pedestrians. 
 option.costOfNonAssignment  = 10;                    % A tuning parameter to control the likelihood of creation of a new track.
 option.confidenceThresh     = 2;                     % A threshold to determine if a track is true positive or false alarm.
 option.ageThresh            = 4;                     % A threshold to determine the minimum length required for a track being true positive.
@@ -96,7 +96,7 @@ end
         obj.blobs = vision.BlobAnalysis('CentroidOutputPort', true, ...
 			'AreaOutputPort', false, ...
 			'BoundingBoxOutputPort', true, ...
-			'MinimumBlobArea', 100);
+			'MinimumBlobArea', 160);
     end
 
 %% Initialize Tracks
@@ -123,8 +123,8 @@ end
 		mask =  obj.detector.step(frame);
 		
 		%Morphological Image cleaning
-		cleanMask = imopen(mask, strel('square', 3));
-% 		cleanMask = imclose(cleanMask, strel('disk', 5));
+		cleanMask = imopen(mask, strel('square', 4));
+ 		cleanMask = imclose(cleanMask, strel('disk', 2));
 %         cleanMask = imerode(cleanMask, strel('disk', 2));
 		cleanMask = imfill(cleanMask, 'holes');
 		mask = cleanMask;
@@ -190,7 +190,7 @@ end
             bbox = tracks(i).bbox;
             
             % Predict the current location of the track.
-            predictedCentroid = vision.KalmanFilter.predict(tracks(i).kalmanFilter);
+            predictedCentroid = predict(tracks(i).kalmanFilter);
             
             % Shift the bounding box so that its center is at 
             % the predicted location.
@@ -262,8 +262,7 @@ end
 	function deleteLostTracks()
         if isempty(tracks)
             return;
-        end
-        
+        end   
         
         % Compute the fraction of the track's age for which it was visible.
         ages = [tracks(:).age];
@@ -332,18 +331,22 @@ end
             % Display the objects. If an object has not been detected
             % in this frame, display its predicted bounding box.
             if ~isempty(reliableTracks)
+               
                 
+                % Count the displayed tracks and update track  display
+                % option.
                 for i = 1:length(reliableTracks)
                 
                     if reliableTracks(i).displayed == false
                         count = count + 1;
-                        reliableTracks(i).displayed = true;
                     end
                 end
-                countid = reliableTracks(:).id;
+                countid = [reliableTracks(:).id];
                 
-                for i = length(reliableTracks);
-                    tracks(countid(i)).displayed = true;
+                for i = 1:length(reliableTracks);
+                    if countid(i) == tracks(i).id
+                        tracks(i).displayed = true;
+                    end
                 end
                 
                 % Get bounding boxes.
@@ -376,9 +379,7 @@ end
         step (obj.maskPlayer, mask)
     end
 
-%% Count Tracked Objects
 
-%     function countTrackedObjects(tracked)
 %% release video reader, player
 release(obj.videoPlayer);
 release(obj.reader);
