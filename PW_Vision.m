@@ -1,10 +1,56 @@
 
 % PW Computer Vision 
+% 
+% 
+% Basic Overview
+% 
+% The process for detecting and counting people in this program is as
+% follows:
+% 
+% First, using the input video, a foreground detector is setup. This system
+% object detects and subtracts the background from the video per frame,
+% resulting in a white on black mask. The mask is then cleaned through
+% morphological operations. The mask passes through a blob analysis object
+% outputting bounding boxes and centroids per detection. These are then
+% filtered according to area, location, and aspect ratio. After filtering
+% detections, tracking is implemented. The tracks are filtered, and the
+% remaining tacks are displayed and counted.
+% 
+% 
+% Known Issues
+% 
+% Video input is a timelapse with one frame taken every three seconds. As
+% such, a number of issues arise:
+%
+% 1. People/Cars/Bikes/Dogs/Objects move extremely quickly, jumping across
+% the video. Computer vision (CV) motion tracking works best with higher
+% frame rates as blobs 'appear' to move smoothly. As a result, tracks in
+% the timelapse struggle to maintain correct assignments with detections.
+% 
+% 2. As the camera is on auto-mode, the images can greatly vary between
+% frames in terms of color balance and lighting (exposure, aperture, ISO,
+% etc). Coupled with the low frame rate, this forces erros in the
+% foreground detector which in turn translates to multiple (upwards of 50+!)
+% false detections in a single frame.
+% 
+% 3. Dogs and bikes cannot be properly detected and categorized. For bikes,
+% there are too few frames in which they are detected and shown resulting
+% in failure to assign tracks. For dogs, detection works; however, as
+% tracking is based off a linear model, the tracks cannot accurately
+% predict and assign detections since the dogs move erratically with
+% the low frame rate.
+% 
+% 4. Occaisionally, objects that become occluded are double or triple
+% counted. This could be a result of insufficient frames to accurately
+% predict an established track.
+
+
 
 function PW_Vision()
 
 %% Main Program
 videoFile = 'Test_1.avi';
+videoFWriter = vision.VideoFileWriter('Sample.avi');
 
 obj = setupSystemObjects(videoFile);
 
@@ -21,33 +67,53 @@ count = 0;
 frame = step(obj.reader);
 
 % Set the global parameters
-option.peopleRatio          = 2;					 % Aspect ratio to filter out blobs.
-option.peopleArea           = 55000;                  % A threshold to control the area for detecting pedestrians. 
-option.costOfNonAssignment  = 10;                    % A tuning parameter to control the likelihood of creation of a new track.
-option.confidenceThresh     = 2;                     % A threshold to determine if a track is true positive or false alarm.
-option.ageThresh            = 4;                     % A threshold to determine the minimum length required for a track being true positive.
-option.visThresh            = 0.6;                   % A threshold to determine the minimum visibility value for a track being true positive.
-option.invisibTooLong       = 8;                     % A threshold to determine if a track has gone off frame.
+option.peopleRatio          = 2.5;					 % Aspect ratio to filter out blobs for example if the blob is too wide or too long its not a real thing
+option.peopleArea           = 55000;                 % A threshold to control the area for detecting pedestrians. 
+option.costOfNonAssignment  = 12;                    % A tuning parameter to control the likelihood of creation of a new track.
+option.ageThresh            = 5;                     % A threshold to determine the minimum length required for a track being true positive. A ratio of the total number of visible frames over the total age of the track
+option.visThresh            = 0.5;                   % A threshold to determine the minimum visibility value for a track being true positive.
+option.invisibTooLong       = 5;                     % A threshold to determine if a track has gone off frame.
 option.ROI					= roipoly(frame);		 % User-defined Region of Interest (ROI) to help filter detections.
 
 close all;
 
 
 while ~isDone(obj.reader);
+    
+    % code is sequential here one loop of this code is one frame of the
+    % video
+    
+    % Simply moves video player forward
     frame = step(obj.reader);
     
+    % Section A: No tracking this code will simply create bounding boxes
+    % around people for each frame
+    
+    % This detects objects that is any blob
     [centroids, bboxes, mask] = detectObjects(frame);
     
+    % This filters the objects detected in the equation above to count
+    % people, bboxPeople = boundingBox people, centPeople = centroid people
     [bboxPeople, centPeople] = detectionFilter (option.ROI, option.peopleRatio, option.peopleArea, bboxes, centroids);
     
+    % Section B: This section attempts to track these bounding boxses
+    % through time to produce a count of people coming and going
+    
+    % Runs through tracks from previous frames and attempts to predict them
     predictNewLocationsOfTracks();    
     
+    % Attempts to assign detections to tracks
     [assignments, unassignedTracks, unassignedDetections] = ...
         detectionToTrackAssignment();
     
+    % Update counts like age and visibility
     updateAssignedTracks();    
-    updateUnassignedTracks();    
-    deleteLostTracks();    
+    updateUnassignedTracks();  
+    deleteLostTracks(); 
+    
+    % Creates new tracks takes unassigned detections and creates new tracks
+    % only for unassigned detections
+     
     createNewTracks();
     
     displayTrackingResults();
@@ -75,8 +141,8 @@ end
         
         % Create two video players, one to display the video,
         % and one to display the foreground mask.
-        obj.videoPlayer = vision.VideoPlayer('Position', [20, 400, 700, 400]);
-        obj.maskPlayer = vision.VideoPlayer('Position', [740, 400, 700, 400]);
+        obj.videoPlayer = vision.VideoPlayer('Position', [20, 400, 800, 500]);
+        obj.maskPlayer = vision.VideoPlayer('Position', [840, 400, 800, 500]);
         
         % Create System objects for foreground detection and blob analysis
         
@@ -85,8 +151,14 @@ end
         % of 1 corresponds to the foreground and the value of 0 corresponds
         % to the background. 
         
-        obj.detector = vision.ForegroundDetector('NumGaussians', 3, ...
-            'NumTrainingFrames', 100, 'LearningRate', 0.01);
+        % So white areas in the foreground mask correspond to differences
+        % in the image in time therefore the trick is to get the settings
+        % as such that the white appears when we want it to e.g people,
+        % dogs
+        
+        obj.detector = vision.ForegroundDetector('NumGaussians', 5, ...
+            'NumTrainingFrames', 100, 'LearningRate', 0.005, ...
+            'InitialVariance', 900);
         
         % Connected groups of foreground pixels are likely to correspond to moving
         % objects.  The blob analysis System object is used to find such groups
@@ -96,7 +168,7 @@ end
         obj.blobs = vision.BlobAnalysis('CentroidOutputPort', true, ...
 			'AreaOutputPort', false, ...
 			'BoundingBoxOutputPort', true, ...
-			'MinimumBlobArea', 160);
+			'MinimumBlobArea', 200);
     end
 
 %% Initialize Tracks
@@ -111,7 +183,6 @@ end
             'totalVisibleCount', {}, ...
             'consecutiveInvisibleCount', {}, ...
             'predPosition', {},...
-            'number', {},...
             'displayed', {});
     end    
 
@@ -122,14 +193,20 @@ end
 		%Create foreground mask
 		mask =  obj.detector.step(frame);
 		
-		%Morphological Image cleaning
-		cleanMask = imopen(mask, strel('square', 4));
- 		cleanMask = imclose(cleanMask, strel('disk', 2));
+		%Morphological Image cleaning - the idea being to clean out and get
+		%rid of noise
+        % cleaner one
+		cleanMask = imopen(mask, strel('square', 2));
+        % cleaner two
+        cleanMask = imerode(mask, strel('square', 4));
+        % cleaner three
+ 		cleanMask = imdilate(cleanMask, strel('square', 3));
 %         cleanMask = imerode(cleanMask, strel('disk', 2));
+        % cleaner four - detects holes
 		cleanMask = imfill(cleanMask, 'holes');
 		mask = cleanMask;
 		
-		%Blob detection
+		%Blob detection - blob analysis
 		[centroids, bboxes] = obj.blobs.step(mask);
 	 end
 
@@ -143,7 +220,8 @@ end
             return
         end
         
-		%Calculate Ratio, Area, Centroid Coordinates
+		%Calculate Ratio, Area, Centroid Coordinates of the bounding boxes
+		%of the blobs which are represented as arrays BBox: [x,y,w,h]
 		w = bbox(:,3);
 		h = bbox(:,4);
 		if ~isempty(ROI)
@@ -154,12 +232,13 @@ end
 		ratio = double(w) ./ double(h);
 		area = h .* w;
 
-		%Filter out the bboxes
+		%Filter out the boxes that don't meet the requirements (too large/
+		%centroid not in the right area 
 
 		badBbox = ratio > maxRatio;
 		badBbox = badBbox | area > maxArea;
 
-		%Filter out centroids if not in ROI
+		%Filter out centroids if not in region of interest (ROI)
 		badCentroid = int8.empty();
 %         disp (centroids);
 		if ~isempty(ROI)
@@ -205,20 +284,45 @@ end
 			detectionToTrackAssignment()
    
         nTracks = length(tracks);
+        
+        % centPeople are the centroids that have been filtered through in
+        % this particular frame
+        
         nDetections = size(centPeople, 1);
         
-        % Compute the cost of assigning each detection to each track.
+        % Compute the cost of assigning each detection to each track. The
+        % cost is looking at the difference between the centroid of the
+        % predictation and the centroid of the detection e.g the distance
+        % between the two and the best match is the shortest distance
+        % between the two
+        
+        % Find the cost for every assignment, an assignment is a assigned
+        % track in the previous frame  
+        % A unassigned track is a track that had no detection in the
+        % previous frame but has not yet been deleted it is within the time
+        % limit
+        
+        % Now go through and calculate the cost for each track in this
+        % frame (both assigned and unassigned)
         cost = zeros(nTracks, nDetections);
         for i = 1:nTracks
             cost(i, :) = distance(tracks(i).kalmanFilter, centPeople);
         end
         
-        % Solve the assignment problem.
+        % 
+        % The hungarian algrorithm for this frame will determine whether a
+        % detection and track are paired together (basically assigned)
+        % the kalmanFilter is correct - see the first graph here http://www.mathworks.com/help/vision/ref/assigndetectionstotracks.html
+        
         [assignments, unassignedTracks, unassignedDetections] = ...
             assignDetectionsToTracks(cost, option.costOfNonAssignment);
     end
 	
 %% Update Assigned Tracks
+    
+% Update the age of the assigned tracks and the visible count
+% age is the number of frames that a track has existed in the video 
+% the visibility count is the name 
 
 	function updateAssignedTracks()
         numAssignedTracks = size(assignments, 1);
@@ -258,6 +362,7 @@ end
     end
 
 %% Delete Lost Tracks
+% This function determines when a track has been lost - which usually means that the blob has gone off the screen 
 
 	function deleteLostTracks()
         if isempty(tracks)
@@ -265,11 +370,14 @@ end
         end   
         
         % Compute the fraction of the track's age for which it was visible.
+        % ages is a list of the all the ages of the tracks
         ages = [tracks(:).age];
+        % Number of frames that a track was assigned a detection
         totalVisibleCounts = [tracks(:).totalVisibleCount];
+        % visibility is a ratio
         visibility = totalVisibleCounts ./ ages;
         
-        % Find the indices of 'lost' tracks.
+        % Find the indices of 'lost' tracks % 
         lostInds = (ages < option.ageThresh & visibility < option.visThresh) | ...
             [tracks(:).consecutiveInvisibleCount] >= option.invisibTooLong;
         
@@ -288,9 +396,12 @@ end
             centroid = centPeople(i,:);
             bbox = bboxPeople(i, :);
             
-            % Create a Kalman filter object.
+            % Create a Kalman filter object, every track has a Kalman
+            % filter - the purpose of the Kalman filter is to 
+            % make predictions on where the object will be
+            
             kalmanFilter = configureKalmanFilter('ConstantVelocity', ...
-                centroid, [50, 200], [25, 300], 250);
+                centroid, [200, 500], [500, 350], 50);
             
             % Create a new track.
             newTrack = struct(...
@@ -301,7 +412,6 @@ end
                 'totalVisibleCount', 1, ...
                 'consecutiveInvisibleCount', 0, ...
 				'predPosition', bbox, ...
-                'number', 0, ...
                 'displayed', false);
             
             % Add it to the array of tracks.
@@ -333,12 +443,13 @@ end
             if ~isempty(reliableTracks)
                
                 
-                % Count the displayed tracks and update track  display
+                % Count the displayed tracks and update track display
                 % option.
                 for i = 1:length(reliableTracks)
                 
                     if reliableTracks(i).displayed == false
                         count = count + 1;
+                        reliableTracks(i).displayed = true;
                     end
                 end
                 countid = [reliableTracks(:).id];
@@ -353,27 +464,34 @@ end
                 bboxes = cat(1, reliableTracks.bbox);
                 
                 % Get ids.
-                ids = int32([reliableTracks(:).id]);
+
+%                 ids = int32([reliableTracks(:).id]);
                 
                 % Create labels for objects indicating the ones for 
                 % which we display the predicted rather than the actual 
                 % location.
-                labels = cellstr(int2str(ids'));
-                predictedTrackInds = ...
-                    [reliableTracks(:).consecutiveInvisibleCount] > 0;
-                isPredicted = cell(size(labels));
-                isPredicted(predictedTrackInds) = {'predicted'};
-                labels = strcat(labels, isPredicted);
+%                 labels = cellstr(int2str(ids'));
+%                 predictedTrackInds = ...
+%                     [reliableTracks(:).consecutiveInvisibleCount] > 0;
+%                 isPredicted = cell(size(labels));
+%                 isPredicted(predictedTrackInds) = {'predicted'};
+%                 labels = strcat(labels, isPredicted);
+                labels = 'tracked person';
                 
                 % Draw the objects on the frame.
                 frame = insertObjectAnnotation(frame, 'rectangle', ...
                     bboxes, labels);
-                frame = insertMarker(frame, centroids, '+', 'Color', 'green');
+                mask = insertObjectAnnotation(mask, 'rectangle', ...
+                    bboxes, labels);
+%                 frame = insertMarker(frame, centroids, '+', 'Color', 'green');
             end
         end
         
-        frame  = insertText(frame, [10 10], count, 'BoxOpacity', 1, ...
+        countLabel = strcat('count: ', num2str(count));
+        frame  = insertText(frame, [10 10], countLabel, 'BoxOpacity', 1, ...
             'FontSize', 14);
+        
+        step (videoFWriter, frame)
 
         step (obj.videoPlayer, frame)
         step (obj.maskPlayer, mask)
