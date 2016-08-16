@@ -69,7 +69,7 @@ frame = step(obj.reader);
 % Set the global parameters
 option.peopleRatio          = 2.5;					 % Aspect ratio to filter out blobs for example if the blob is too wide or too long its not a real thing
 option.peopleArea           = 55000;                 % A threshold to control the area for detecting pedestrians. 
-option.costOfNonAssignment  = 12;                    % A tuning parameter to control the likelihood of creation of a new track.
+option.costOfNonAssignment  = 12;                    % A tuning parameter to control the likelihood of creation of a new track - Robbey didnt change
 option.ageThresh            = 5;                     % A threshold to determine the minimum length required for a track being true positive. A ratio of the total number of visible frames over the total age of the track
 option.visThresh            = 0.5;                   % A threshold to determine the minimum visibility value for a track being true positive.
 option.invisibTooLong       = 5;                     % A threshold to determine if a track has gone off frame.
@@ -96,13 +96,17 @@ while ~isDone(obj.reader);
     % people, bboxPeople = boundingBox people, centPeople = centroid people
     [bboxPeople, centPeople] = detectionFilter (option.ROI, option.peopleRatio, option.peopleArea, bboxes, centroids);
     
-    % Section B: This section attempts to track these bounding boxses
+    % Section B: This section attempts to track these bounding boxes passed through the detectionFilter
     % through time to produce a count of people coming and going
     
-    % Runs through tracks from previous frames and attempts to predict them
+    % Runs through tracks from previous frames and attempts to predict them in the current frame
+    % using the Hungarian algorithm which uses the distance between the predictation and the detection
     predictNewLocationsOfTracks();    
     
-    % Attempts to assign detections to tracks
+    % Attempts to assign detections to the tracks
+    % assignments = A track that has a detection in this frame
+    % unassignedTrack = A track with no detection in this frame
+    % unassignedDections = Detections with no track in this frame
     [assignments, unassignedTracks, unassignedDetections] = ...
         detectionToTrackAssignment();
     
@@ -268,7 +272,10 @@ end
         for i = 1:length(tracks)
             bbox = tracks(i).bbox;
             
-            % Predict the current location of the track.
+            % Predict the current location of the track the kalman filter basically
+            % makes predictions based off velocity and other data in previous detections
+            % settings are configured in configureKalmanFilter
+            
             predictedCentroid = predict(tracks(i).kalmanFilter);
             
             % Shift the bounding box so that its center is at 
@@ -294,7 +301,7 @@ end
         % cost is looking at the difference between the centroid of the
         % predictation and the centroid of the detection e.g the distance
         % between the two and the best match is the shortest distance
-        % between the two
+        % between the two or the lowest cost
         
         % Find the cost for every assignment, an assignment is a assigned
         % track in the previous frame  
@@ -309,10 +316,10 @@ end
             cost(i, :) = distance(tracks(i).kalmanFilter, centPeople);
         end
         
-        % 
+        % Here is the hungarian algrorithm
         % The hungarian algrorithm for this frame will determine whether a
-        % detection and track are paired together (basically assigned)
-        % the kalmanFilter is correct - see the first graph here http://www.mathworks.com/help/vision/ref/assigndetectionstotracks.html
+        % detection and track are the same object, 
+        % thats when the kalman Filter is correct - see the first graph here http://www.mathworks.com/help/vision/ref/assigndetectionstotracks.html
         
         [assignments, unassignedTracks, unassignedDetections] = ...
             assignDetectionsToTracks(cost, option.costOfNonAssignment);
