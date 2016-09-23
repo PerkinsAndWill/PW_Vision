@@ -49,7 +49,7 @@
 function PW_Vision()
 
 %% Main Program
-videoFile = 'Test_1.avi';
+videoFile = 'C:\Users\szilasia\Desktop\Test_1.avi';
 videoFWriter = vision.VideoFileWriter('Sample.avi');
 
 obj = setupSystemObjects(videoFile);
@@ -76,7 +76,6 @@ option.invisibTooLong       = 5;                     % A threshold to determine 
 option.ROI					= roipoly(frame);		 % User-defined Region of Interest (ROI) to help filter detections.
 
 close all;
-
 
 while ~isDone(obj.reader);
     
@@ -187,7 +186,8 @@ end
             'totalVisibleCount', {}, ...
             'consecutiveInvisibleCount', {}, ...
             'predPosition', {},...
-            'displayed', {});
+            'displayed', {},...
+            'centroidLog',[]); 
     end    
 
 %% Detect objects
@@ -347,6 +347,18 @@ end
             % bounding box.
             tracks(trackIdx).bbox = bbox;
             
+            % Add the centroid of the track to the track's centroid log
+            
+            a = tracks(trackIdx).centroidLog
+            
+            %%tracks(trackIdx).centroidLog = [tracks(trackIdx).centroidLog+centroid]
+            
+            i = size(tracks(trackIdx).centroidLog)
+            
+            tracks(trackIdx).centroidLog(i) = centroid;
+            
+            cl = tracks(trackIdx).centroidLog
+            
             % Update track's age.
             tracks(trackIdx).age = tracks(trackIdx).age + 1;
             
@@ -419,7 +431,8 @@ end
                 'totalVisibleCount', 1, ...
                 'consecutiveInvisibleCount', 0, ...
 				'predPosition', bbox, ...
-                'displayed', false);
+                'displayed', false,...
+                'centroidLog',[]);
             
             % Add it to the array of tracks.
             tracks(end + 1) = newTrack;
