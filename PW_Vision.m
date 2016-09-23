@@ -187,7 +187,8 @@ end
             'consecutiveInvisibleCount', {}, ...
             'predPosition', {},...
             'displayed', {},...
-            'centroidLog',[]); 
+            'centroidLogx',[],...
+            'centroidLogy',[]); 
     end    
 
 %% Detect objects
@@ -349,15 +350,17 @@ end
             
             % Add the centroid of the track to the track's centroid log
             
-            a = tracks(trackIdx).centroidLog
-            
             %%tracks(trackIdx).centroidLog = [tracks(trackIdx).centroidLog+centroid]
             
-            i = size(tracks(trackIdx).centroidLog)
+            i = length(tracks(trackIdx).centroidLogx)
             
-            tracks(trackIdx).centroidLog(i) = centroid;
+            tracks(trackIdx).centroidLogx(i+1) = centroid(1);
             
-            cl = tracks(trackIdx).centroidLog
+            tracks(trackIdx).centroidLogy(i+1) = centroid(2);
+            
+            clx = tracks(trackIdx).centroidLogx
+            
+            cly = tracks(trackIdx).centroidLogy
             
             % Update track's age.
             tracks(trackIdx).age = tracks(trackIdx).age + 1;
@@ -432,7 +435,8 @@ end
                 'consecutiveInvisibleCount', 0, ...
 				'predPosition', bbox, ...
                 'displayed', false,...
-                'centroidLog',[]);
+                'centroidLogx',[],...
+                'centroidLogy',[]); 
             
             % Add it to the array of tracks.
             tracks(end + 1) = newTrack;
