@@ -358,10 +358,6 @@ end
             
             tracks(trackIdx).centroidLogy(i+1) = centroid(2);
             
-            clx = tracks(trackIdx).centroidLogx
-            
-            cly = tracks(trackIdx).centroidLogy
-            
             % Update track's age.
             tracks(trackIdx).age = tracks(trackIdx).age + 1;
             
@@ -403,6 +399,29 @@ end
         lostInds = (ages < option.ageThresh & visibility < option.visThresh) | ...
             [tracks(:).consecutiveInvisibleCount] >= option.invisibTooLong;
         
+        % Noisy detections tend to result in short-lived tracks.
+        % Only consider tracks that have been visible for more than a
+        % minimum number of frames for directional tracking
+
+        reliableLostTrackInds = ...
+            [tracks(lostInds).totalVisibleCount] > option.ageThresh;
+        
+        % Determine the direction of the track and where it left the screen
+
+        for idx = 1:numel(reliableLostTrackInds)
+            
+            trackid = reliableLostTrackInds(idx)
+            
+            if trackid ~= 0
+
+                xdirection = tracks(idx).centroidLogx(1)-tracks(idx).centroidLogx(end)
+
+                ydirection = tracks(idx).centroidLogy(1)-tracks(idx).centroidLogy(end)
+
+            end
+        
+        end 
+            
         % Delete lost tracks.
         tracks = tracks(~lostInds);
     end
