@@ -62,6 +62,10 @@ nextId = 1;
 
 % Object Count
 count = 0;
+% Count of objects leaving from top or bottom of screen
+countBottom = 0;
+
+countTop = 0;
 
 %Get a still of the first frame
 frame = step(obj.reader);
@@ -84,6 +88,10 @@ while ~isDone(obj.reader);
     
     % Simply moves video player forward
     frame = step(obj.reader);
+    
+    % Decrease speed so can see clearly what the algorithm  is doing
+    
+    pause(0.05)
     
     % Section A: No tracking this code will simply create bounding boxes
     % around people for each frame
@@ -350,9 +358,10 @@ end
             
             % Add the centroid of the track to the track's centroid log
             
-            %%tracks(trackIdx).centroidLog = [tracks(trackIdx).centroidLog+centroid]
+            i = length(tracks(trackIdx).centroidLogx);
             
-            i = length(tracks(trackIdx).centroidLogx)
+            % is generating adding centroid to array twice, what is matlab
+            % for if num in array???
             
             tracks(trackIdx).centroidLogx(i+1) = centroid(1);
             
@@ -407,17 +416,31 @@ end
             [tracks(lostInds).totalVisibleCount] > option.ageThresh;
         
         % Determine the direction of the track and where it left the screen
-
+        % then display the number of tracks that have left from the top and
+        % the bottom
+        
         for idx = 1:numel(reliableLostTrackInds)
             
-            trackid = reliableLostTrackInds(idx)
+            trackid = reliableLostTrackInds(idx);
             
             if trackid ~= 0
 
-                xdirection = tracks(idx).centroidLogx(1)-tracks(idx).centroidLogx(end)
+                xdirectionMovement = tracks(idx).centroidLogx(1)-tracks(idx).centroidLogx(end);
 
-                ydirection = tracks(idx).centroidLogy(1)-tracks(idx).centroidLogy(end)
+                ydirectionMovement = tracks(idx).centroidLogy(1)-tracks(idx).centroidLogy(end);
+                
+                if ydirectionMovement > 0
+                    
+                    countTop = countTop +1;
 
+                end
+
+                if ydirectionMovement < 0
+                    
+                    countBottom = countBottom +1;
+
+                end
+                
             end
         
         end 
@@ -485,7 +508,6 @@ end
             % in this frame, display its predicted bounding box.
             if ~isempty(reliableTracks)
                
-                
                 % Count the displayed tracks and update track display
                 % option.
                 for i = 1:length(reliableTracks)
@@ -530,9 +552,19 @@ end
             end
         end
         
-        countLabel = strcat('count: ', num2str(count));
+        % Display the total person count
+        countLabel = strcat('Count: ', num2str(count));
         frame  = insertText(frame, [10 10], countLabel, 'BoxOpacity', 1, ...
-            'FontSize', 14);
+            'FontSize', 10);
+        
+        % Display the count of person leaving from specific area
+        countTopLabel = strcat('Top corner: ', num2str(countTop));
+        frame  = insertText(frame, [10 25], countTopLabel, 'BoxOpacity', 1, ...
+            'FontSize', 10);
+        
+        countBottomLabel = strcat('Bottom corner: ', num2str(countBottom));
+        frame  = insertText(frame, [10 50], countBottomLabel, 'BoxOpacity', 1, ...
+            'FontSize', 10);
         
         step (videoFWriter, frame)
 
