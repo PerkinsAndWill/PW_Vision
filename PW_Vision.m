@@ -91,7 +91,7 @@ while ~isDone(obj.reader);
     
     % Decrease speed so can see clearly what the algorithm  is doing
     
-    pause(0.05)
+    pause(0.1)
     
     % Section A: No tracking this code will simply create bounding boxes
     % around people for each frame
@@ -429,13 +429,17 @@ end
 
                 ydirectionMovement = tracks(idx).centroidLogy(1)-tracks(idx).centroidLogy(end);
                 
-                if ydirectionMovement > 0
+                xdirectionMovement
+                
+                ydirectionMovement
+                
+                if ydirectionMovement > 45
                     
                     countTop = countTop +1;
 
                 end
 
-                if ydirectionMovement < 0
+                if ydirectionMovement < 45
                     
                     countBottom = countBottom +1;
 
@@ -564,6 +568,10 @@ end
         
         countBottomLabel = strcat('Bottom corner: ', num2str(countBottom));
         frame  = insertText(frame, [10 50], countBottomLabel, 'BoxOpacity', 1, ...
+            'FontSize', 10);
+        
+        countTotalLabel = strcat('Count Total: ', num2str(countBottom+countTop));
+        frame  = insertText(frame, [10 70], countTotalLabel, 'BoxOpacity', 1, ...
             'FontSize', 10);
         
         step (videoFWriter, frame)
