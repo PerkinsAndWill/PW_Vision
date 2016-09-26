@@ -67,6 +67,8 @@ countBottom = 0;
 
 countTop = 0;
 
+frameNum = 0
+
 %Get a still of the first frame
 frame = step(obj.reader);
 
@@ -88,6 +90,8 @@ while ~isDone(obj.reader);
     
     % Simply moves video player forward
     frame = step(obj.reader);
+    
+    frameNum = frameNum + 1;
     
     % Decrease speed so can see clearly what the algorithm  is doing
     
@@ -146,6 +150,8 @@ end
         % Initialize Video I/O
         % Create objects for reading a video from a file, drawing the tracked
         % objects in each frame, and playing the video.
+        
+        %v = VideoReader(videoFile);
         
         % Create a video file reader.
         obj.reader = vision.VideoFileReader(videoFile, 'VideoOutputDataType', 'uint8');
