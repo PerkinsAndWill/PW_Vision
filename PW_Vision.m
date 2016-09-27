@@ -67,8 +67,6 @@ countBottom = 0;
 
 countTop = 0;
 
-frameNum = 0
-
 %Get a still of the first frame
 frame = step(obj.reader);
 
@@ -91,11 +89,9 @@ while ~isDone(obj.reader);
     % Simply moves video player forward
     frame = step(obj.reader);
     
-    frameNum = frameNum + 1;
-    
     % Decrease speed so can see clearly what the algorithm  is doing
     
-    pause(0.1)
+    pause(0.1);
     
     % Section A: No tracking this code will simply create bounding boxes
     % around people for each frame
@@ -103,9 +99,12 @@ while ~isDone(obj.reader);
     % This detects objects that is any blob
     [centroids, bboxes, mask] = detectObjects(frame);
     
+    
     % This filters the objects detected in the equation above to count
     % people, bboxPeople = boundingBox people, centPeople = centroid people
     [bboxPeople, centPeople] = detectionFilter (option.ROI, option.peopleRatio, option.peopleArea, bboxes, centroids);
+    
+    %bboxPeople
     
     % Section B: This section attempts to track these bounding boxes passed through the detectionFilter
     % through time to produce a count of people coming and going
@@ -152,6 +151,8 @@ end
         % objects in each frame, and playing the video.
         
         %v = VideoReader(videoFile);
+        
+        %frame = v.read(v,frameNum)
         
         % Create a video file reader.
         obj.reader = vision.VideoFileReader(videoFile, 'VideoOutputDataType', 'uint8');
@@ -250,12 +251,22 @@ end
 
 		ratio = double(w) ./ double(h);
 		area = h .* w;
+        
+        % Get the size of the matrix of the boundingBox, matrices with
+        % sizes of greater than 2 tend to be camera re-calibration
+        % disturbances
+        
+        sizeVector = size(bbox);
+        xSizeVector = sizeVector(1);
 
 		%Filter out the boxes that don't meet the requirements (too large/
 		%centroid not in the right area 
 
 		badBbox = ratio > maxRatio;
 		badBbox = badBbox | area > maxArea;
+        badBbox = badBbox | xSizeVector > 3;
+        
+        %badBBox = size(      > 2;
 
 		%Filter out centroids if not in region of interest (ROI)
 		badCentroid = int8.empty();
@@ -279,6 +290,9 @@ end
 		%Apply the Filter
 		filteredIdx = bbox(logical(~filter), :);
 		filteredCentroids = centroids(logical(~filter), :);
+        
+        filteredIdx
+        size(filteredIdx)
 	end
 	
 %% Predict New Locations of exisiting tracks
@@ -435,22 +449,21 @@ end
 
                 ydirectionMovement = tracks(idx).centroidLogy(1)-tracks(idx).centroidLogy(end);
                 
-                xdirectionMovement
+                xdirectionMovement;
                 
-                ydirectionMovement
+                ydirectionMovement;
                 
-                if ydirectionMovement > 45
+                if ydirectionMovement > 30
                     
                     countTop = countTop +1;
 
                 end
 
-                if ydirectionMovement < 45
+                if ydirectionMovement < 30
                     
                     countBottom = countBottom +1;
 
                 end
-                
             end
         
         end 
