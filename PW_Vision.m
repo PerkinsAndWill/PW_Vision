@@ -31,7 +31,8 @@
 % frames in terms of color balance and lighting (exposure, aperture, ISO,
 % etc). Coupled with the low frame rate, this forces erros in the
 % foreground detector which in turn translates to multiple (upwards of 50+!)
-% false detections in a single frame.
+% false detections in a single frame. - UPDATE: This has now been addressed in
+% commit bac3c6a git s
 % 
 % 3. Dogs and bikes cannot be properly detected and categorized. For bikes,
 % there are too few frames in which they are detected and shown resulting
@@ -576,7 +577,7 @@ end
         end
         
         % Display the total person count
-        countLabel = strcat('Count: ', num2str(count));
+        countLabel = strcat('Count without x y displacement: ', num2str(count));
         frame  = insertText(frame, [10 10], countLabel, 'BoxOpacity', 1, ...
             'FontSize', 10);
         
